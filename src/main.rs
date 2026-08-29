@@ -76,7 +76,7 @@ impl eframe::App for KpsApp {
                 let eased_t = ease_out(key.t);
 
                 let x = GAP + i as f32 * (BUTTON_WIDTH + GAP);
-                let y: f32 = 10.0 + WATERFALL_HEIGHT;
+                let y: f32 = WATERFALL_HEIGHT;
                 let base_center = egui::Pos2::new(x + BUTTON_WIDTH / 2.0, y + BUTTON_HEIGHT / 2.0);
                 let offset = KEY_UP.offset.lerp(KEY_DOWN.offset, eased_t);
                 let center = base_center + offset.to_vec2();
@@ -113,7 +113,7 @@ impl eframe::App for KpsApp {
                 if let Some(last) = key.segments.last_mut() {
                     if last.growing {
                         last.height += WATERFALL_SPEED * dt;
-                        last.y_offset -= WATERFALL_SPEED * dt;
+                        last.y_offset -= WATERFALL_SPEED * dt; // dirty hack who cares
                     }
                 }
 

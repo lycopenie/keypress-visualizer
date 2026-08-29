@@ -51,6 +51,10 @@ impl KeyState {
             segments: Vec::new(),
         }
     }
+
+    pub fn update(&mut self, dt: f32) -> f32 {
+        
+    }
 }
 
 pub struct Segment {
