@@ -4,8 +4,7 @@ use eframe::egui::{self};
 use evdev::EventSummary;
 use std::sync::{Arc, Mutex};
 
-use key_state::{KEY_DOWN, KEY_UP, KEYS, KeyState, ease_out};
-use crate::key_state::Segment;
+use key_state::{KEY_DOWN, KEY_UP, KEYS, KeyState, WATERFALL_HEIGHT};
 
 struct KpsApp {
     keys: Arc<Mutex<Vec<KeyState>>>,
@@ -15,11 +14,6 @@ struct KpsApp {
 const BUTTON_WIDTH: f32 = 50.0;
 const BUTTON_HEIGHT: f32 = 50.0;
 const GAP: f32 = 10.0;
-const RISE_TIME: f32 = 0.01;
-const FALL_TIME: f32 = 0.2;
-
-const WATERFALL_SPEED: f32 = 300.0;
-const WATERFALL_HEIGHT: f32 = 500.0;
 
 impl KpsApp {
     fn new() -> Self {
@@ -64,17 +58,8 @@ impl eframe::App for KpsApp {
         egui::CentralPanel::default().show(ui, |ui| {
             let painter = ui.painter();
             for (i, key) in self.keys.lock().unwrap().iter_mut().enumerate() {
-                let just_pressed = key.is_down && !key.was_down;
-                let just_released = !key.is_down && key.was_down;
-
+                let eased_t = key.update(dt);
                 // buttons visuals calculations
-                if key.is_down {
-                    key.t = (key.t + dt / RISE_TIME).min(1.0);
-                } else {
-                    key.t = (key.t - dt / FALL_TIME).max(0.0);
-                }
-                let eased_t = ease_out(key.t);
-
                 let x = GAP + i as f32 * (BUTTON_WIDTH + GAP);
                 let y: f32 = WATERFALL_HEIGHT;
                 let base_center = egui::Pos2::new(x + BUTTON_WIDTH / 2.0, y + BUTTON_HEIGHT / 2.0);
@@ -97,34 +82,6 @@ impl eframe::App for KpsApp {
                     egui::FontId::default(),
                     egui::Color32::WHITE,
                 );
-
-                // waterfall visuals
-                if just_pressed {
-                    key.segments.push(Segment { height: 0.0, y_offset: 0.0, growing: true });
-                    key.press_count += 1;
-                }
-                if just_released {
-                    if let Some(seg) = key.segments.iter_mut().find(|s| s.growing) {
-                        seg.growing = false;
-                    }
-                }
-
-                // growing
-                if let Some(last) = key.segments.last_mut() {
-                    if last.growing {
-                        last.height += WATERFALL_SPEED * dt;
-                        last.y_offset -= WATERFALL_SPEED * dt; // dirty hack who cares
-                    }
-                }
-
-                // offset waterfall
-                for segment in key.segments.iter_mut() {
-                    segment.y_offset += WATERFALL_SPEED * dt;
-                }
-
-                key.segments.retain(|s| s.y_offset < WATERFALL_HEIGHT); // cleanup
-
-                key.was_down = key.is_down;
 
                 // drawing waterfall
                 for segment in key.segments.iter() {
