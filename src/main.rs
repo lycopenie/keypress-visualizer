@@ -1,19 +1,12 @@
+mod key_state;
+
 use eframe::egui::{self};
-use evdev::{EventSummary, KeyCode};
+use evdev::EventSummary;
 use std::sync::{Arc, Mutex};
 
-const KEYS: [(KeyCode, &str); 4] = [
-    (KeyCode::KEY_S, "S"),
-    (KeyCode::KEY_D, "D"),
-    (KeyCode::KEY_K, "K"),
-    (KeyCode::KEY_L, "L"),
-];
+use key_state::{KEY_DOWN, KEY_UP, KEYS, KeyState, ease_out};
+use crate::key_state::Segment;
 
-struct KeyVisualState {
-    color: egui::Color32,
-    scale: egui::Vec2,
-    offset: egui::Pos2,
-}
 struct KpsApp {
     keys: Arc<Mutex<Vec<KeyState>>>,
     last_frame: std::time::Instant,
@@ -25,21 +18,8 @@ const GAP: f32 = 10.0;
 const RISE_TIME: f32 = 0.01;
 const FALL_TIME: f32 = 0.2;
 
-const KEY_UP: KeyVisualState = KeyVisualState {
-    color: egui::Color32::from_gray(60),
-    scale: egui::Vec2::new(1.0, 1.0),
-    offset: egui::Pos2::new(0.0, 0.0),
-};
-const KEY_DOWN: KeyVisualState = KeyVisualState {
-    color: egui::Color32::from_gray(150),
-    scale: egui::Vec2::new(1.05, 1.05),
-    offset: egui::Pos2::new(0.0, 2.0),
-};
-
-// easing
-fn ease_out(t: f32) -> f32 {
-    1.0 - (1.0 - t).powi(2)
-}
+const WATERFALL_SPEED: f32 = 300.0;
+const WATERFALL_HEIGHT: f32 = 500.0;
 
 impl KpsApp {
     fn new() -> Self {
@@ -84,6 +64,10 @@ impl eframe::App for KpsApp {
         egui::CentralPanel::default().show(ui, |ui| {
             let painter = ui.painter();
             for (i, key) in self.keys.lock().unwrap().iter_mut().enumerate() {
+                let just_pressed = key.is_down && !key.was_down;
+                let just_released = !key.is_down && key.was_down;
+
+                // buttons visuals calculations
                 if key.is_down {
                     key.t = (key.t + dt / RISE_TIME).min(1.0);
                 } else {
@@ -92,11 +76,8 @@ impl eframe::App for KpsApp {
                 let eased_t = ease_out(key.t);
 
                 let x = GAP + i as f32 * (BUTTON_WIDTH + GAP);
-                let y: f32 = 10.0;
-                let base_center = egui::Pos2::new(
-                    x + BUTTON_WIDTH / 2.0,
-                    y + BUTTON_HEIGHT / 2.0,
-                );
+                let y: f32 = 10.0 + WATERFALL_HEIGHT;
+                let base_center = egui::Pos2::new(x + BUTTON_WIDTH / 2.0, y + BUTTON_HEIGHT / 2.0);
                 let offset = KEY_UP.offset.lerp(KEY_DOWN.offset, eased_t);
                 let center = base_center + offset.to_vec2();
                 let size = egui::vec2(BUTTON_WIDTH, BUTTON_HEIGHT)
@@ -116,30 +97,53 @@ impl eframe::App for KpsApp {
                     egui::FontId::default(),
                     egui::Color32::WHITE,
                 );
+
+                // waterfall visuals
+                if just_pressed {
+                    key.segments.push(Segment { height: 0.0, y_offset: 0.0, growing: true });
+                    key.press_count += 1;
+                }
+                if just_released {
+                    if let Some(seg) = key.segments.iter_mut().find(|s| s.growing) {
+                        seg.growing = false;
+                    }
+                }
+
+                // growing
+                if let Some(last) = key.segments.last_mut() {
+                    if last.growing {
+                        last.height += WATERFALL_SPEED * dt;
+                        last.y_offset -= WATERFALL_SPEED * dt;
+                    }
+                }
+
+                // offset waterfall
+                for segment in key.segments.iter_mut() {
+                    segment.y_offset += WATERFALL_SPEED * dt;
+                }
+
+                key.segments.retain(|s| s.y_offset < WATERFALL_HEIGHT); // cleanup
+
+                key.was_down = key.is_down;
+
+                // drawing waterfall
+                for segment in key.segments.iter() {
+                    let segment_x = x;
+                    let segment_y = y - segment.y_offset - segment.height;
+                    let segment_width = BUTTON_WIDTH;
+                    let segment_height = segment.height;
+
+                    painter.rect_filled(
+                        egui::Rect::from_min_size(
+                            egui::Pos2::new(segment_x, segment_y),
+                            egui::vec2(segment_width, segment_height),
+                        ),
+                        0.0,
+                        egui::Color32::WHITE,
+                    );
+                }
             }
         });
-    }
-}
-
-struct KeyState {
-    keycode: KeyCode,
-    label: String,
-    is_down: bool,
-    was_down: bool,
-    press_count: u32,
-    t: f32,
-}
-
-impl KeyState {
-    fn new(keycode: KeyCode, label: String) -> Self {
-        KeyState {
-            keycode,
-            label,
-            is_down: false,
-            was_down: false,
-            press_count: 0,
-            t: 0.0,
-        }
     }
 }
 
