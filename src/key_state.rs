@@ -5,12 +5,13 @@ const RISE_TIME: f32 = 0.01;
 const FALL_TIME: f32 = 0.2;
 
 const WATERFALL_SPEED: f32 = 300.0;
+pub(crate) const WATERFALL_MARGIN: f32 = 5.0;
 pub(crate) const WATERFALL_HEIGHT: f32 = 500.0;
 pub const KEYS: [(KeyCode, &str); 4] = [
-    (KeyCode::KEY_S, "S"),
-    (KeyCode::KEY_D, "D"),
-    (KeyCode::KEY_K, "K"),
-    (KeyCode::KEY_L, "L"),
+    (KeyCode::KEY_Q, "Q"),
+    (KeyCode::KEY_W, "W"),
+    (KeyCode::KEY_LEFTBRACE, "["),
+    (KeyCode::KEY_RIGHTBRACE, "]"),
 ];
 
 pub struct KeyVisualState {

@@ -3,8 +3,7 @@ mod key_state;
 use eframe::egui::{self};
 use evdev::EventSummary;
 use std::sync::{Arc, Mutex};
-
-use key_state::{KEY_DOWN, KEY_UP, KEYS, KeyState, WATERFALL_HEIGHT};
+use key_state::{KEY_DOWN, KEY_UP, KEYS, KeyState, WATERFALL_HEIGHT, WATERFALL_MARGIN};
 
 struct KpsApp {
     keys: Arc<Mutex<Vec<KeyState>>>,
@@ -57,11 +56,12 @@ impl eframe::App for KpsApp {
 
         egui::CentralPanel::default().show(ui, |ui| {
             let painter = ui.painter();
-            for (i, key) in self.keys.lock().unwrap().iter_mut().enumerate() {
+            let mut keys = self.keys.lock().unwrap();
+            for (i, key) in keys.iter_mut().enumerate() {
                 let eased_t = key.update(dt);
                 // buttons visuals calculations
                 let x = GAP + i as f32 * (BUTTON_WIDTH + GAP);
-                let y: f32 = WATERFALL_HEIGHT;
+                let y: f32 = WATERFALL_HEIGHT + WATERFALL_MARGIN;
                 let base_center = egui::Pos2::new(x + BUTTON_WIDTH / 2.0, y + BUTTON_HEIGHT / 2.0);
                 let offset = KEY_UP.offset.lerp(KEY_DOWN.offset, eased_t);
                 let center = base_center + offset.to_vec2();
@@ -86,7 +86,7 @@ impl eframe::App for KpsApp {
                 // drawing waterfall
                 for segment in key.segments.iter() {
                     let segment_x = x;
-                    let segment_y = y - segment.y_offset - segment.height;
+                    let segment_y = y - segment.y_offset - segment.height - WATERFALL_MARGIN;
                     let segment_width = BUTTON_WIDTH;
                     let segment_height = segment.height;
 
@@ -100,6 +100,14 @@ impl eframe::App for KpsApp {
                     );
                 }
             }
+            let total: u32 = keys.iter().map(|k| k.press_count).sum();
+            painter.text(
+                egui::Pos2::new(0.0, WATERFALL_HEIGHT + WATERFALL_MARGIN + BUTTON_HEIGHT + 10.0), // hardcoded margin W
+                egui::Align2::LEFT_TOP,
+                format!("Total: {}", total),
+                egui::FontId::default(),
+                egui::Color32::WHITE,
+            );
         });
     }
 }
