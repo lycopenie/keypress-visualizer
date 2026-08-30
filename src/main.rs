@@ -113,7 +113,14 @@ impl eframe::App for KpsApp {
 }
 
 fn main() -> eframe::Result<()> {
-    let options = eframe::NativeOptions::default();
+    let options = eframe::NativeOptions {
+        // eframe defaults to the wgpu renderer as of 0.34+, which has a
+        // known bug causing runaway repaints / high CPU on native Wayland
+        // (see https://github.com/emilk/egui/issues/3924). glow doesn't
+        // have this problem, so force it explicitly.
+        renderer: eframe::Renderer::Glow,
+        ..Default::default()
+    };
     eframe::run_native(
         "keypress",
         options,
