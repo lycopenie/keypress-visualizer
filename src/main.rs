@@ -22,23 +22,33 @@ impl KpsApp {
         }
         let keys = Arc::new(Mutex::new(keys));
 
-        let keys_clone = Arc::clone(&keys);
-        std::thread::spawn(move || {
-            let mut device = evdev::Device::open("/dev/input/event8").unwrap();
-            loop {
-                for event in device.fetch_events().unwrap() {
-                    match event.destructure() {
-                        EventSummary::Key(_, keycode, value) => {
-                            let mut keys = keys_clone.lock().unwrap();
-                            if let Some(key) = keys.iter_mut().find(|k| k.keycode == keycode) {
-                                key.is_down = value != 0;
+        for (_path, mut device) in evdev::enumerate() {
+            let is_relevant = device
+                .supported_keys()
+                .map_or(false, |supported| {
+                    KEYS.iter().any(|(keycode, _)| supported.contains(*keycode))
+                });
+            if !is_relevant {
+                continue;
+            }
+
+            let keys_clone = Arc::clone(&keys);
+            std::thread::spawn(move || {
+                loop {
+                    for event in device.fetch_events().unwrap() {
+                        match event.destructure() {
+                            EventSummary::Key(_, keycode, value) => {
+                                let mut keys = keys_clone.lock().unwrap();
+                                if let Some(key) = keys.iter_mut().find(|k| k.keycode == keycode) {
+                                    key.is_down = value != 0;
+                                }
                             }
+                            _ => {}
                         }
-                        _ => {}
                     }
                 }
-            }
-        });
+            });
+        }
 
         KpsApp {
             keys,
